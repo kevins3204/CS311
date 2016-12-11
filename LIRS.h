@@ -181,6 +181,8 @@ struct cache_set_t
   struct cache_blk_t *blks;	/* cache blocks, allocated sequentially, so
 				   this pointer can also be used for random
 				   access to cache blocks */
+  list_t *lirs_stack s; /* stack for saving LIRS items */
+  list_t *hir_resident_stack q;
 };
 
 /* cache definition */
