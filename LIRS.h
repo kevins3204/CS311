@@ -140,6 +140,13 @@ enum cache_policy {
 #define CACHE_BLK_VALID		0x00000001	/* block in valid, in use */
 #define CACHE_BLK_DIRTY		0x00000002	/* dirty block */
 
+/* LIRS block state */
+enum LIRS_state {
+  LIR,
+  HIR_RESIDENT,
+  HIR_NONRESIDENT
+};
+
 /* cache block (or line) definition */
 struct cache_blk_t
 {
@@ -161,6 +168,7 @@ struct cache_blk_t
      defined in this structure! */
   byte_t data[1];		/* actual data block starts here, block size
 				   should probably be a multiple of 8 */
+  enum LIRS_state lirs_state;   /* save lirs_state of a block */
 };
 
 /* cache set definition (one or more blocks sharing the same set index) */
@@ -173,6 +181,8 @@ struct cache_set_t
   struct cache_blk_t *blks;	/* cache blocks, allocated sequentially, so
 				   this pointer can also be used for random
 				   access to cache blocks */
+  list_t *lirs_stack s; /* stack for saving LIRS blocks */
+  list_t *hir_resident_stack q;	/* stack for saving hir resident blocks */
 };
 
 /* cache definition */
