@@ -329,4 +329,15 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 		 md_addr_t addr,	/* address of block to flush */
 		 tick_t now);		/* time of cache flush */
 
+typedef struct node {
+  cache_blk_t item;
+  node *prev;
+  node *next;
+} node_t;
+
+typedef struct list {
+  node *front;  /* bottom if used as a stack*/
+  node *end;    /* top if used as a stack*/
+} list_t;
+
 #endif /* CACHE_H */
