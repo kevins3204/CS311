@@ -737,17 +737,65 @@ cache_access(struct cache_t *cp,	/* cache to access */
   if (cmd == Write)
     blk->status |= CACHE_BLK_DIRTY;
 
-  if (cp->state == LIR)
-  {
-  }
-
-  if (cp->state == HIR_RESIDENT)
-  {
-
-  }
-
-  /* if LIRS replacement and this is not the first element of list, reorder */
-  if (blk->way_prev && cp->policy == LIRS)
+  /* to check whether access block is HIR and not in stack */
+  bool HIR_in_stack = FALSE;
+  /* we want to know whether accessing cache is in stack or not */
+  for (blk = cp->sets[set].s->head;
+	   blk;
+	   blk = blk->s_next)
+	{
+	  /* in case of accessing cache is in stack */
+	  if (blk->tag == tag)
+	  {
+	    lirs_state = blk->lirs_state; 		/* lirs_state will be the state of block with same tag address */
+	  	if(lirs_state == LIR)				/* in case of chosen state is LIR */
+	  	{
+	  		if(blk != s->tail)				/* in case of LIR is not bottom, move LIR to top and connect previous and next of LIR */
+	  		{
+		  		blk->s_prev->s_next = blk->s_next;		
+		  		blk->s_next->s_prev = blk->s_prev;
+		  		blk->s_prev = NULL;
+		  		blk->s_next = s->head;
+		  		s->head = blk;	  			
+	  		}
+	  		else				/* in case of LIR is bottom, move LIR to top and do stack pruning */
+	  		{
+	  			blk->s_prev->s_next = NULL;
+	  			cp->sets[set].s->tail = blk->s_prev;
+	  			blk->s_prev = NULL;
+	  			blk->s_next = cp->sets[set].s->head;
+	  			cp->sets[set].s->head = blk;
+	  			stack_pruning(cp->sets[set].s);
+	  		}
+	  		HIR_in_stack = TRUE; 			/* it is not HIR, LIR */
+	  	}
+	  	if(lirs_state == HIR)				/* in case of chosen state is HIR and it is in stack */
+	  	{
+	  		blk->lirs_state = LIR;			/* change HIR block into LIR */
+	  		cp->sets[set].s->tail->lirs_state = HIR_RESIDENT;		/* change bottom block into HIR, since it was LIR due to stack pruning */
+	  		blk->s_prev->s_next = blk->s_next;		/* move this block to top and connect previous and next of this block */
+	  		blk->s_next->s_prev = blk->s_prev;
+	  		blk->s_prev = NULL;				
+	  		blk->s_next = cp->sets[set].s->head;
+	  		cp->sets[set].s->head = blk;
+	  		cp->sets[set]->hir_resident_block = cp->sets[set].s->tail;
+	  		stack_pruning(cp->sets[set].s);				/* do stack pruning since bottom of stack became HIR */
+	  		HIR_in_stack = TRUE; 			/* it is HIR but in stack */
+	  	}
+	  }
+	}
+	/* HIR_in_stack still FALSE means that accessing cache is HIR but it is not in stack since it is a hit */
+	if(HIR_in_stack == FALSE)
+	{ 					
+		/* HIR is added in to top of stack */
+		cp->sets[set].hir_resident_block->s_next = cp->sets[set].s->head;
+		cp->sets[set].hir_resident_block->s_prev = NULL;
+		cp->sets[set].s->head->s_prev = cp->sets[set].hir_resident_block;
+		cp->sets[set].s->head = cp->sets[set].hir_resident_block;
+	}
+  
+  /* if LRU replacement and this is not the first element of list, reorder */
+  if (blk->way_prev && cp->policy == LRU)
     {
       /* move this block to head of the way (MRU) list */
       update_way_list(&cp->sets[set], blk, Head);
