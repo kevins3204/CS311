@@ -542,6 +542,16 @@ cache_stats(struct cache_t *cp,		/* cache instance */
 	  (double)cp->invalidations/sum);
 }
 
+/* stack pruning is to keep the bottom of stack as LIR */
+void
+stack_pruning(list_t s){
+	while(s->tail != LIR)
+	{
+		s->tail = s->tail->s_prev;
+		s->tail->s_next = NULL;
+	}
+}
+
 /* access a cache, perform a CMD operation on cache CP at address ADDR,
    places NBYTES of data at *P, returns latency of operation if initiated
    at NOW, places pointer to block user data in *UDATA, *P is untouched if
