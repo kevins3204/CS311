@@ -445,6 +445,21 @@ cache_create(char *name,		/* name of the cache */
 	  cp->sets[i].way_head = blk;
 	  if (!cp->sets[i].way_tail)
 	    cp->sets[i].way_tail = blk;
+		
+	  if (policy == LIRS) { /* if policy is LIRS, then set the stack S and Q */
+            blk->lirs_state = LIR;
+            blk->s_next = cp->sets[i]->s.head;
+            blk->s_prev = NULL;
+            if (cp->sets[i]->s.head)
+              cp->sets[i]->s.head->s.prev = blk;
+            cp->sets[i]->s.head = blk;
+            if (!cp->sets[i]->s.tail)
+              cp->sets[i]->s.tail = blk;
+            if (j == 3) { /* if last block in the set, then this block will be the only HIR resident block of this set */
+              blk->lirs_state = HIR_RESIDENT;
+              cp->sets[i].hir_resident_block = blk;
+            }
+          }
 	}
     }
   return cp;
@@ -644,6 +659,56 @@ cache_access(struct cache_t *cp,	/* cache to access */
     repl = cp->sets[set].way_tail;
     update_way_list(&cp->sets[set], repl, Head);
     break;
+  case LIRS:
+    {
+      repl = cp->sets[set].hir_resident_block;  /* block to be replaced is always the only HIR resident block */
+      cache_blk_t *old_blk = (byte_t *)calloc(1,
+            sizeof(struct cache_blk_t) +
+            (cp->balloc ? (bsize*sizeof(byte_t)) : 0));   /* create a cache_blk_t pointer to save the repl block */
+      /* copy repl block to old_blk block */
+      old_blk->tag = repl->tag;
+      old_blk->status = repl->status;
+      old_blk->ready = repl->ready;
+      old_blk->user_data = repl->user_data;
+      old_blk->data[0] = repl->data[0];
+      old_blk->lirs_state = HIR_NONRESIDENT;  /* LIRS state is changed to HIR non-resident */
+      old_blk->s_prev = repl->s_prev;
+      old_blk->s_next = repl->s_next;
+      /* insert old_blk into the place where repl is placed in LIRS stack s */
+      if (old_blk->s_prev) 
+        old_blk->s_prev->s_next = old_blk;
+      if (old_blk->s_next)
+        old_blk->s_next->s_prev = old_blk;
+      if (cp->sets[set].s->head->tag == old_blk->tag && cp->sets[set].s->head->status == old_blk->status)
+        cp->sets[set].s->head = old_blk;
+      if (cp->sets[set].s->tail->tag == old_blk->tag && cp->sets[set].s->tail->status == old_blk->status)
+        cp->sets[set].s->tail = old_blk;
+
+      /* move repl block to the top of the LIRS stack s */
+      repl->s_prev = NULL;
+      repl->s_next = cp->sets[set].s->head;
+      cp->sets[set].s->head = repl->s_next;
+
+      for (blk = cp->sets[set].s->head; blk; blk = blk->s_next) {
+        if (blk->tag == tag) {  /* inserted block was already in the LIRS stack s */
+          /* blk should be same as repl... delete blk from the LIRS stack s */
+          /* blk is not on the top nor bottom of s because top is repl and bottom is a LIR block */
+          blk->s_prev->s_next = blk->s_next;
+          blk->s_next->s_prev = blk->s_prev;
+
+          repl->lirs_state = LIR;   /* change repl to LIR block */
+          cp->sets[set].s->tail->lirs_state = HIR_RESIDENT;   /* change the LIR block in the bottom of s to HIR block */
+          cp->sets[set].hir_resident_block = cp->sets[set].s->tail;   /* the block in the bottom of s is now the only HIR resident block */
+          stack_pruning(cp->sets[set].s);   /* do stack pruning */
+          break;
+        }
+      }
+
+      if (!blk) {   /* inserted block was not in the LIRS stack s */
+        repl->lirs_state = HIR_RESIDENT;   /* repl stays as HIR block */
+        cp->sets[set].hir_resident_block = repl;  /* repl is still the only HIR resident block */
+      }
+    }
   case Random:
     {
       int bindex = myrand() & (cp->assoc - 1);
