@@ -169,20 +169,22 @@ struct cache_blk_t
   byte_t data[1];		/* actual data block starts here, block size
 				   should probably be a multiple of 8 */
   enum LIRS_state lirs_state;   /* save lirs_state of a block */
+  struct cache_blk_t *s_prev;   /* previous block in the LIRS stack s */
+  struct cache_blk_t *s_next;   /* next block in the LIRS stack s */
 };
 
 /* cache set definition (one or more blocks sharing the same set index) */
 struct cache_set_t
 {
-  struct cache_blk_t **hash;	/* hash table: for fast access w/assoc, NULL
-				   for low-assoc caches */
-  struct cache_blk_t *way_head;	/* head of way list */
-  struct cache_blk_t *way_tail;	/* tail of way list */
-  struct cache_blk_t *blks;	/* cache blocks, allocated sequentially, so
-				   this pointer can also be used for random
-				   access to cache blocks */
+  struct cache_blk_t **hash;  /* hash table: for fast access w/assoc, NULL
+           for low-assoc caches */
+  struct cache_blk_t *way_head; /* head of way list */
+  struct cache_blk_t *way_tail; /* tail of way list */
+  struct cache_blk_t *blks; /* cache blocks, allocated sequentially, so
+           this pointer can also be used for random
+           access to cache blocks */
   list_t *lirs_stack s; /* stack for saving LIRS blocks */
-  list_t *hir_resident_stack q;	/* stack for saving hir resident blocks */
+  struct cache_blk_t *hir_resident_block;
 };
 
 /* cache definition */
@@ -346,8 +348,8 @@ typedef struct node {
 } node_t;
 
 typedef struct list {
-  node *front;  /* bottom if used as a stack*/
-  node *end;    /* top if used as a stack*/
+  node *head;  /* bottom if used as a stack*/
+  node *tail;    /* top if used as a stack*/
 } list_t;
 
 #endif /* CACHE_H */
